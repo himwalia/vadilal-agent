@@ -1,94 +1,69 @@
 import os
-from langchain.prompts import PromptTemplate
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
+import streamlit as st
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
-from langchain.memory import ConversationBufferMemory
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+def get_api_key():
+    # Try to get API key from Streamlit secrets first (for production)
+    try:
+        return st.secrets["openrouter"]["api_key"]
+    except (KeyError, FileNotFoundError):
+        # Fall back to environment variable (for local development)
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            st.error("OpenRouter API key not found. Please add it to your Streamlit secrets or .env file.")
+        return api_key
 
-def setup_retrieval_chain():
+def process_vadilal_data(file_path):
     """
-    Set up the retrieval chain for the Vadilal AI chatbot.
+    Process the Vadilal Group text data and store it in a vector database.
+    
+    Args:
+        file_path: Path to the text file containing Vadilal data
     
     Returns:
-        A conversational retrieval chain
+        A Chroma vector database instance
     """
-    # Initialize embeddings
+    # Get API key
+    api_key = get_api_key()
+    
+    # Read the data file
+    print(f"Reading data from {file_path}")
+    with open(file_path, 'r', encoding='utf-8') as file:
+        vadilal_data = file.read()
+    
+    # Split text into chunks
+    print("Splitting text into chunks...")
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        length_function=len,
+    )
+    chunks = text_splitter.split_text(vadilal_data)
+    print(f"Created {len(chunks)} chunks of text")
+    
+    # Create embeddings using OpenRouter API (with OpenAI compatible endpoint)
+    print("Creating embeddings...")
     embeddings = OpenAIEmbeddings(
-        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+        openai_api_key=api_key,
         openai_api_base="https://openrouter.ai/api/v1",
-        model="openai/text-embedding-ada-002"
+        model="openai/text-embedding-ada-002"  # Use an embedding model available on OpenRouter
     )
     
-    # Load the persisted database
-    vectordb = Chroma(
-        persist_directory="./vadilal_data_db",
-        embedding_function=embeddings
+    # Create and persist vector store
+    print("Creating vector database...")
+    db = Chroma.from_texts(
+        chunks, 
+        embeddings, 
+        persist_directory="./vadilal_data_db"
     )
     
-    # Initialize the retriever
-    retriever = vectordb.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": 5}
-    )
-    
-    # Create a custom prompt template
-    template = """
-    You are a specialized AI assistant for the Vadilal Group, an Indian ice cream and frozen foods company.
-    You have been trained on publicly available information about Vadilal Group.
-    
-    Your goal is to provide accurate, informative responses about:
-    - Company overview, history, and structure
-    - Financial performance and shareholding information
-    - Product portfolio and market presence
-    - Industry trends and competition
-    - Leadership profiles and company updates
-    
-    Use the following pieces of context to answer the question at the end.
-    If you don't know the answer based on the provided context, just say that you don't have enough information - don't try to make up an answer.
-    Keep your answers direct, professional, and informative.
-    
-    Context: {context}
-    
-    Question: {question}
-    
-    Helpful Answer:"""
-    
-    prompt = PromptTemplate(
-        template=template,
-        input_variables=["context", "question"]
-    )
-    
-    # Initialize conversation memory
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True
-    )
-    
-    # Initialize LLM with OpenRouter API
-    llm = ChatOpenAI(
-        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-        openai_api_base="https://openrouter.ai/api/v1",
-        model="anthropic/claude-3-sonnet@20240229",  # You can change to another model available on OpenRouter
-        temperature=0.2,
-        max_tokens=1000
-    )
-    
-    # Create the conversational chain
-    chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=retriever,
-        memory=memory,
-        combine_docs_chain_kwargs={"prompt": prompt}
-    )
-    
-    return chain
+    print("Vector database created successfully!")
+    return db
 
 if __name__ == "__main__":
     # Example usage
-    chain = setup_retrieval_chain()
-    response = chain.invoke({"question": "What is Vadilal Group's main business?"})
-    print(response["answer"])
+    db = process_vadilal_data("vadilal_data.txt")
+    db.persist()
+    print("Database persisted to disk. Ready for querying!")
