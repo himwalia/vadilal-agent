@@ -212,19 +212,19 @@ def main():
     data_loaded = check_existing_data()
     
     if not data_loaded:
-    # Don't require data upload to start
-    # Just initialize with empty data or a default welcome message
-    if not st.session_state.messages:
-        st.session_state.messages.append({
-            "role": "assistant", 
-            "content": "Hello! I'm your Vadilal Group AI assistant. I'm ready to answer your questions."
-        })
-    
-    # Make the upload optional
-    with st.sidebar:
-        st.header("Upload Data")
-        st.write("Upload your Vadilal data file (optional):")
-        upload_data_file()
+        # Don't require data upload to start
+        # Just initialize with empty data or a default welcome message
+        if not st.session_state.messages:
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": "Hello! I'm your Vadilal Group AI assistant. I'm ready to answer your questions."
+            })
+        
+        # Make the upload optional
+        with st.sidebar:
+            st.header("Upload Data")
+            st.write("Upload your Vadilal data file (optional):")
+            upload_data_file()
         
     else:
         # Display chat messages
