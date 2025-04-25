@@ -1,8 +1,8 @@
 import os
 import streamlit as st
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
 def get_api_key():
     # Try to get API key from Streamlit secrets first (for production)
@@ -43,12 +43,13 @@ def process_vadilal_data(file_path):
     chunks = text_splitter.split_text(vadilal_data)
     print(f"Created {len(chunks)} chunks of text")
     
-    # Create embeddings using OpenRouter API (with OpenAI compatible endpoint)
+    # Create ChatOpenAIusing OpenRouter API (with OpenAI compatible endpoint)
     print("Creating embeddings...")
-    embeddings = OpenAIEmbeddings(
+    ChatOpenAI= OpenAIEmbeddings(
         api_key=api_key,
         base_url="https://openrouter.ai/api/v1",
-        model="openai/text-embedding-ada-002"
+        model="openai/text-embedding-ada-002",
+        # Remove any proxies parameter if it exists
     )
     
     # Create and persist vector store
