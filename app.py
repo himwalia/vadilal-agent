@@ -56,6 +56,14 @@ st.markdown("""
     .chat-message .message {
         flex-grow: 1;
     }
+
+    /* Ensure text is visible */
+    .chat-message .message {
+        color: #333333 !important;
+    }
+    p, h1, h2, h3, h4, h5, h6, li, span {
+        color: #333333 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
