@@ -83,7 +83,7 @@ def setup_retrieval_chain():
     llm = ChatOpenAI(
         openai_api_key=api_key,
         openai_api_base="https://openrouter.ai/api/v1",
-        model="anthropic/claude-3-sonnet@20240229",  # You can change to another model available on OpenRouter
+        model="meta-llama/llama-4-maverick:free",  # You can change to another model available on OpenRouter
         temperature=0.2,
         max_tokens=1000
     )
