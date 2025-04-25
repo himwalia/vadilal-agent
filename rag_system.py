@@ -29,8 +29,8 @@ def setup_retrieval_chain():
     
     # Initialize embeddings
     embeddings = OpenAIEmbeddings(
-        openai_api_key=api_key,
-        openai_api_base="https://openrouter.ai/api/v1",
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
         model="openai/text-embedding-ada-002"
     )
     
