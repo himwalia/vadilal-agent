@@ -1,268 +1,211 @@
 import streamlit as st
-import re
-import nltk
-import json
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from nltk.tokenize import sent_tokenize
+import os
+from dotenv import load_dotenv
+from rag_system import setup_retrieval_chain
+from data_processing import process_vadilal_data
 
-# Download NLTK resources
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
+# Load environment variables
+load_dotenv()
 
-# Page configuration
+# Set page configuration
 st.set_page_config(
-    page_title="Vadilal Group AI Agent",
+    page_title="Vadilal Group AI Assistant",
     page_icon="🍦",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Styling
+# Custom CSS for better appearance
 st.markdown("""
 <style>
-    .main-header {color: #0066b2; font-size: 2.5em;}
-    .sub-header {color: #0066b2; font-size: 1.5em;}
-    .stButton button {background-color: #0066b2; color: white;}
-    .info-box {background-color: #f0f8ff; padding: 20px; border-radius: 5px;}
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .chat-message {
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+    }
+    .chat-message.user {
+        background-color: #e6f7ff;
+    }
+    .chat-message.bot {
+        background-color: #f0f2f5;
+    }
+    .chat-message .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        margin-right: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+    .chat-message .user-avatar {
+        background-color: #2b7bf7;
+        color: white;
+    }
+    .chat-message .bot-avatar {
+        background-color: #0f52ba;
+        color: white;
+    }
+    .chat-message .message {
+        flex-grow: 1;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# App title
-st.markdown('<h1 class="main-header">Vadilal Group Knowledge Assistant</h1>', unsafe_allow_html=True)
-st.markdown("""
-<div class="info-box">
-Ask any questions about Vadilal Group's business, financial performance, competitors, market position, and the ice cream industry in India.
-</div>
-""", unsafe_allow_html=True)
+def initialize_session_state():
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+    
+    if 'chain' not in st.session_state:
+        try:
+            st.session_state.chain = setup_retrieval_chain()
+        except Exception as e:
+            st.error(f"Error initializing RAG system: {str(e)}")
+            st.session_state.chain = None
 
-# Initialize session state
-if 'chunks' not in st.session_state:
-    st.session_state.chunks = []
-    st.session_state.tfidf_matrix = None
-    st.session_state.vectorizer = None
+def display_messages():
+    for idx, msg in enumerate(st.session_state.messages):
+        if msg["role"] == "user":
+            with st.container():
+                st.markdown(f"""
+                <div class="chat-message user">
+                    <div class="avatar user-avatar">👤</div>
+                    <div class="message">{msg["content"]}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            with st.container():
+                st.markdown(f"""
+                <div class="chat-message bot">
+                    <div class="avatar bot-avatar">🍦</div>
+                    <div class="message">{msg["content"]}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-# Load and prepare data
-@st.cache_resource
-def load_and_process_data():
-    # Load the document
-    with open("vadilal_deepsearch.txt", "r", encoding="utf-8") as f:
-        text = f.read()
-    
-    # Extract sections
-    sections = re.split(r'\*\*\d+\.\s+[A-Z\s]+(\([^)]+\))?\*\*|\*\*[A-Z\s]+(:|)\*\*', text)
-    
-    # Process sections into chunks
-    chunks = []
-    chunk_id = 0
-    
-    # First pass: create larger contextual chunks based on sections
-    for section in sections:
-        if len(section.strip()) > 100:  # Ignore small sections which might be just titles
-            paragraphs = re.split(r'\n\n+', section)
-            for para in paragraphs:
-                if len(para.strip()) > 100:  # Only include substantial paragraphs
-                    # Determine section type
-                    section_type = "General"
-                    if "COMPANY OVERVIEW" in para or "Manufacturing Facilities" in para:
-                        section_type = "Company Overview"
-                    elif "FINANCIAL PERFORMANCE" in para or "Annual Revenue" in para:
-                        section_type = "Financial Performance"
-                    elif "SHAREHOLDING" in para or "Promoter Holding" in para:
-                        section_type = "Shareholding"
-                    elif "COMPETITOR" in para or "Market Share" in para:
-                        section_type = "Competitors"
-                    elif "INDUSTRY TRENDS" in para or "Market Size" in para:
-                        section_type = "Industry Trends"
-                    
-                    chunks.append({
-                        "id": chunk_id,
-                        "text": para,
-                        "section": section_type
+def process_user_input():
+    if user_query := st.chat_input("Ask something about Vadilal Group..."):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        
+        # Display loading spinner while processing
+        with st.spinner("Thinking..."):
+            if st.session_state.chain:
+                try:
+                    # Get response from the chain
+                    response = st.session_state.chain.invoke({"question": user_query})
+                    answer = response["answer"]
+                except Exception as e:
+                    answer = f"I encountered an error while processing your question: {str(e)}"
+            else:
+                answer = "I'm having trouble accessing the Vadilal Group information. Please check the system setup."
+        
+        # Add bot response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+
+def upload_data_file():
+    uploaded_file = st.file_uploader("Upload your Vadilal data text file", type=["txt"])
+    if uploaded_file is not None:
+        # Save the uploaded file
+        with open("vadilal_data.txt", "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        st.success("File uploaded successfully! Processing data...")
+        
+        # Process the data
+        with st.spinner("Processing Vadilal data... This may take a few minutes."):
+            try:
+                process_vadilal_data("vadilal_data.txt")
+                st.success("Data processed successfully! The AI assistant is ready to use.")
+                
+                # Reinitialize the chain
+                st.session_state.chain = setup_retrieval_chain()
+                
+                # Add a welcome message
+                if not st.session_state.messages:
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": "Hello! I'm your Vadilal Group AI assistant. How can I help you today?"
                     })
-                    chunk_id += 1
-    
-    # Create TF-IDF vectorizer and fit on all chunks
-    vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform([chunk["text"] for chunk in chunks])
-    
-    return chunks, tfidf_matrix, vectorizer
+                
+                # Rerun to refresh the page
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Error processing data: {str(e)}")
 
-# Search function using TF-IDF and cosine similarity
-def search_relevant_chunks(query, top_k=5):
-    # Transform the query using the fitted vectorizer
-    query_vector = st.session_state.vectorizer.transform([query])
+def main():
+    # Display header
+    st.title("🍦 Vadilal Group AI Assistant")
+    st.markdown("""
+    Welcome to the Vadilal Group AI Assistant. I can help you with information about:
+    - Company overview and history
+    - Financial performance
+    - Shareholding breakdown
+    - Competitors analysis
+    - Industry trends
+    - Products and services
+    - Leadership profiles
+    """)
     
-    # Calculate cosine similarity between query and all chunks
-    similarities = cosine_similarity(query_vector, st.session_state.tfidf_matrix).flatten()
+    # Initialize session state
+    initialize_session_state()
     
-    # Get indices of top k similar chunks
-    top_indices = similarities.argsort()[-top_k:][::-1]
-    
-    # Return the chunks corresponding to these indices
-    return [st.session_state.chunks[i] for i in top_indices if similarities[i] > 0]
-
-# Generate answer
-def generate_answer(question, context_chunks):
-    # Format context text from chunks
-    context = "\n\n".join([chunk["text"] for chunk in context_chunks])
-    
-    # Extract relevant sections from context based on question type
-    relevant_sentences = []
-    all_sentences = sent_tokenize(context)
-    
-    # Simplify question for matching
-    lower_q = question.lower()
-    
-    # Look for specific question types and relevant keywords
-    if "shareholding" in lower_q or "promoter" in lower_q:
-        relevant_sentences = [sent for sent in all_sentences if any(kw in sent.lower() for kw in 
-                             ["promoter", "shareholding", "share", "holding", "stake", "%"])]
-    
-    elif "competitor" in lower_q or "market share" in lower_q:
-        relevant_sentences = [sent for sent in all_sentences if any(kw in sent.lower() for kw in 
-                             ["competitor", "market share", "amul", "kwality", "mother dairy", "largest"])]
-    
-    elif "financial" in lower_q or "revenue" in lower_q or "profit" in lower_q:
-        relevant_sentences = [sent for sent in all_sentences if any(kw in sent.lower() for kw in 
-                             ["crore", "revenue", "profit", "ebitda", "fy", "financial", "₹"])]
-    
-    elif "trend" in lower_q or "industry" in lower_q:
-        relevant_sentences = [sent for sent in all_sentences if any(kw in sent.lower() for kw in 
-                             ["trend", "growth", "industry", "market", "consumer", "demand"])]
-    
-    elif "facilities" in lower_q or "plant" in lower_q or "manufacturing" in lower_q:
-        relevant_sentences = [sent for sent in all_sentences if any(kw in sent.lower() for kw in 
-                             ["plant", "manufacturing", "facility", "production", "factory", "capacity"])]
-    
+    # Check if data is already loaded
+    if not os.path.exists("./vadilal_data_db"):
+        st.warning("No Vadilal data found. Please upload your data file to get started.")
+        upload_data_file()
     else:
-        # For general questions, use the first few sentences from each chunk
-        for chunk in context_chunks:
-            chunk_sentences = sent_tokenize(chunk["text"])
-            relevant_sentences.extend(chunk_sentences[:3])
-    
-    # Deduplicate sentences while maintaining order
-    seen = set()
-    unique_relevant_sentences = []
-    for s in relevant_sentences:
-        if s not in seen:
-            seen.add(s)
-            unique_relevant_sentences.append(s)
-    
-    # Format the answer
-    answer = ""
-    
-    # Determine the question type for better formatting
-    if "shareholding" in lower_q:
-        answer += "## Shareholding Breakdown of Vadilal Group\n\n"
+        # Display chat messages
+        display_messages()
         
-        # Extract specific shareholding data
-        promoter_pattern = r"promoter.*?(\d+\.\d+)%"
-        public_pattern = r"public.*?(\d+\.\d+)%"
-        fii_pattern = r"(foreign institutional investors|fii).*?(\d+\.\d+)%"
+        # Get user input
+        process_user_input()
         
-        promoter_match = re.search(promoter_pattern, context.lower())
-        public_match = re.search(public_pattern, context.lower())
-        fii_match = re.search(fii_pattern, context.lower())
-        
-        if promoter_match:
-            answer += f"- **Promoter & Promoter Group**: {promoter_match.group(1)}%\n"
-        if public_match:
-            answer += f"- **Public**: {public_match.group(1)}%\n"
-        if fii_match:
-            answer += f"- **Foreign Institutional Investors**: {fii_match.group(2)}%\n"
-        
-        answer += "\n"
-    
-    elif "competitor" in lower_q:
-        answer += "## Major Competitors of Vadilal Group\n\n"
-    
-    elif "financial" in lower_q:
-        answer += "## Financial Performance Over Last 3 Years\n\n"
-        
-        # Try to extract financial data for specific years
-        years = ["2021-22", "2022-23", "2023-24"]
-        found_data = False
-        
-        for year in years:
-            year_pattern = rf"FY\s*{year}.*?revenue.*?(₹|Rs\.?)\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*crore"
-            profit_pattern = rf"FY\s*{year}.*?profit.*?(₹|Rs\.?)\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*crore"
+        # Add option to upload new data
+        with st.sidebar:
+            st.header("Update Data")
+            st.write("If you want to update the Vadilal Group data, upload a new file:")
+            upload_data_file()
             
-            year_match = re.search(year_pattern, context.lower())
-            profit_match = re.search(profit_pattern, context.lower())
+            # Add sample questions
+            st.header("Sample Questions")
+            sample_questions = [
+                "What is the shareholding breakdown of Vadilal Group?",
+                "Who are the biggest direct competitors of the company?",
+                "What has been the historical financial performance over the last 3 financial years?",
+                "What are the key trends driving the Indian ice cream industry in 2025?",
+                "Who are the key leaders in Vadilal Group?",
+                "What is Vadilal's market share in the Indian ice cream industry?"
+            ]
             
-            if year_match or profit_match:
-                found_data = True
-                answer += f"### FY {year}\n"
-                if year_match:
-                    answer += f"- **Revenue**: ₹{year_match.group(2)} crore\n"
-                if profit_match:
-                    answer += f"- **Net Profit**: ₹{profit_match.group(2)} crore\n"
-                answer += "\n"
-        
-        if not found_data:
-            answer += " ".join(unique_relevant_sentences[:10])
-    
-    elif "trend" in lower_q or "industry" in lower_q:
-        answer += "## Key Trends in the Indian Ice Cream Industry (2025)\n\n"
-    
-    else:
-        answer += "## Information About Vadilal Group\n\n"
-    
-    # If we haven't added specific structured content yet, add the relevant sentences
-    if len(answer.split("\n")) < 5:
-        answer += " ".join(unique_relevant_sentences)
-    
-    return answer
+            for question in sample_questions:
+                if st.button(question):
+                    # Add the sample question to the messages
+                    st.session_state.messages.append({"role": "user", "content": question})
+                    
+                    # Get response from the chain
+                    with st.spinner("Thinking..."):
+                        if st.session_state.chain:
+                            try:
+                                response = st.session_state.chain.invoke({"question": question})
+                                answer = response["answer"]
+                            except Exception as e:
+                                answer = f"I encountered an error while processing your question: {str(e)}"
+                        else:
+                            answer = "I'm having trouble accessing the Vadilal Group information. Please check the system setup."
+                    
+                    # Add the response to the messages
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                    
+                    # Rerun to update the UI
+                    st.experimental_rerun()
 
-# Load data on app start
-if not st.session_state.chunks:
-    with st.spinner("Loading knowledge base..."):
-        st.session_state.chunks, st.session_state.tfidf_matrix, st.session_state.vectorizer = load_and_process_data()
-    st.success(f"Knowledge base loaded with {len(st.session_state.chunks)} information chunks")
-
-# Sidebar with example questions
-st.sidebar.markdown('<h2 class="sub-header">Sample Questions</h2>', unsafe_allow_html=True)
-
-example_questions = [
-    "What is the shareholding breakdown of Vadilal Group?",
-    "Who are the biggest direct competitors of the company?",
-    "What has been the historical financial performance over the last 3 financial years?",
-    "What are the key trends driving the Indian ice cream industry in 2025?",
-    "How many manufacturing facilities does Vadilal have?",
-    "What is Vadilal's international presence?",
-    "What is the EBITDA margin trend for Vadilal?",
-    "Who are the key leaders in Vadilal Group?"
-]
-
-for q in example_questions:
-    if st.sidebar.button(q):
-        st.session_state.question = q
-
-# Main area
-if "question" not in st.session_state:
-    st.session_state.question = ""
-
-# User input
-question = st.text_input("Your question:", value=st.session_state.question)
-
-if question:
-    with st.spinner("Searching for information..."):
-        # Search for relevant chunks
-        relevant_chunks = search_relevant_chunks(question)
-        
-        # Generate answer
-        answer = generate_answer(question, relevant_chunks)
-        
-        # Display answer
-        st.markdown("### Answer")
-        st.markdown(answer)
-        
-        # Display sources
-        with st.expander("Sources"):
-            for i, chunk in enumerate(relevant_chunks):
-                st.markdown(f"**Source {i+1} ({chunk['section']}):**")
-                st.text(chunk["text"][:300] + "...")
+if __name__ == "__main__":
+    main()
