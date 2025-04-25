@@ -46,9 +46,9 @@ def process_vadilal_data(file_path):
     # Create embeddings using OpenRouter API (with OpenAI compatible endpoint)
     print("Creating embeddings...")
     embeddings = OpenAIEmbeddings(
-        openai_api_key=api_key,
-        openai_api_base="https://openrouter.ai/api/v1",
-        model="openai/text-embedding-ada-002"  # Use an embedding model available on OpenRouter
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+        model="openai/text-embedding-ada-002"
     )
     
     # Create and persist vector store
