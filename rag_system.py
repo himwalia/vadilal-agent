@@ -1,10 +1,10 @@
 import os
 import streamlit as st
-from langchain.prompts import PromptTemplate
+from langchain_community.prompts import PromptTemplate
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
-from langchain.vectorstores import Chroma
-from langchain.memory import ConversationBufferMemory
+from langchain_community.chains import ConversationalRetrievalChain
+from langchain_community.vectorstores import Chroma
+from langchain_community.memory import ConversationBufferMemory
 
 def get_api_key():
     # Try to get API key from Streamlit secrets first (for production)
@@ -81,9 +81,9 @@ def setup_retrieval_chain():
     
     # Initialize LLM with OpenRouter API
     llm = ChatOpenAI(
-        openai_api_key=api_key,
-        openai_api_base="https://openrouter.ai/api/v1",
-        model="meta-llama/llama-4-maverick:free",  # You can change to another model available on OpenRouter
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+        model="meta/llama-4-maverick",
         temperature=0.2,
         max_tokens=1000
     )
