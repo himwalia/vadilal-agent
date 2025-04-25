@@ -1,11 +1,10 @@
 import streamlit as st
 import os
-from dotenv import load_dotenv
-from rag_system import setup_retrieval_chain
+import json
+import tempfile
+from storage_handler import StorageHandler
 from data_processing import process_vadilal_data
-
-# Load environment variables
-load_dotenv()
+from rag_system import setup_retrieval_chain
 
 # Set page configuration
 st.set_page_config(
@@ -70,6 +69,9 @@ def initialize_session_state():
         except Exception as e:
             st.error(f"Error initializing RAG system: {str(e)}")
             st.session_state.chain = None
+    
+    if 'storage' not in st.session_state:
+        st.session_state.storage = StorageHandler()
 
 def display_messages():
     for idx, msg in enumerate(st.session_state.messages):
@@ -113,17 +115,30 @@ def process_user_input():
 def upload_data_file():
     uploaded_file = st.file_uploader("Upload your Vadilal data text file", type=["txt"])
     if uploaded_file is not None:
-        # Save the uploaded file
-        with open("vadilal_data.txt", "wb") as f:
-            f.write(uploaded_file.getbuffer())
+        # Create a temporary file to process
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as tmp_file:
+            tmp_file.write(uploaded_file.getbuffer())
+            temp_file_path = tmp_file.name
         
         st.success("File uploaded successfully! Processing data...")
         
         # Process the data
         with st.spinner("Processing Vadilal data... This may take a few minutes."):
             try:
-                process_vadilal_data("vadilal_data.txt")
+                # Read the file content
+                with open(temp_file_path, 'r', encoding='utf-8') as file:
+                    file_content = file.read()
+                
+                # Save to storage
+                if st.session_state.storage.save_text_data(file_content):
+                    st.success("Data saved to persistent storage!")
+                
+                # Process the data
+                process_vadilal_data(temp_file_path)
                 st.success("Data processed successfully! The AI assistant is ready to use.")
+                
+                # Clean up temporary file
+                os.unlink(temp_file_path)
                 
                 # Reinitialize the chain
                 st.session_state.chain = setup_retrieval_chain()
@@ -139,6 +154,34 @@ def upload_data_file():
                 st.experimental_rerun()
             except Exception as e:
                 st.error(f"Error processing data: {str(e)}")
+                # Clean up temporary file
+                os.unlink(temp_file_path)
+
+def check_existing_data():
+    """Check if there's existing data in storage and load it."""
+    if 'storage' in st.session_state:
+        existing_data = st.session_state.storage.get_text_data()
+        if existing_data:
+            # Create a temporary file to process
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as tmp_file:
+                tmp_file.write(existing_data.encode('utf-8'))
+                temp_file_path = tmp_file.name
+            
+            try:
+                # Process the data
+                process_vadilal_data(temp_file_path)
+                
+                # Clean up temporary file
+                os.unlink(temp_file_path)
+                
+                # Return True to indicate data was loaded
+                return True
+            except Exception as e:
+                st.error(f"Error processing existing data: {str(e)}")
+                # Clean up temporary file
+                os.unlink(temp_file_path)
+    
+    return False
 
 def main():
     # Display header
@@ -157,8 +200,10 @@ def main():
     # Initialize session state
     initialize_session_state()
     
-    # Check if data is already loaded
-    if not os.path.exists("./vadilal_data_db"):
+    # Check for existing data in storage
+    data_loaded = check_existing_data()
+    
+    if not data_loaded:
         st.warning("No Vadilal data found. Please upload your data file to get started.")
         upload_data_file()
     else:
