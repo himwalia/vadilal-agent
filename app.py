@@ -23,6 +23,13 @@ def main():
         with st.chat_message(message["role"]):
             st.write(message["content"])
     
+    # Debug section - Show available models
+    if st.sidebar.checkbox("Debug Mode"):
+        if api_key:
+            available_models = get_available_models(api_key)
+            st.sidebar.write("Available Models:")
+            st.sidebar.json(available_models)
+    
     # Get user input
     if user_input := st.chat_input("Ask something about Vadilal Group..."):
         # Add user message to chat history
@@ -58,7 +65,6 @@ def main():
     for question in sample_questions:
         if st.sidebar.button(question):
             # Set the question in the chat input
-            # This is a hack since we can't directly set the chat input value
             st.session_state.messages.append({"role": "user", "content": question})
             with st.chat_message("user"):
                 st.write(question)
@@ -75,8 +81,25 @@ def main():
             # Force a rerun to update the UI
             st.experimental_rerun()
 
+def get_available_models(api_key):
+    """Get available models from OpenRouter."""
+    url = "https://openrouter.ai/api/v1/models"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"error": f"Status code: {response.status_code}"}
+    except Exception as e:
+        return {"error": str(e)}
+
 def call_openrouter(prompt, api_key):
-    """Call OpenRouter API directly without using langchain."""
+    """Call OpenRouter API directly."""
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
@@ -109,7 +132,7 @@ If you don't know the answer to a specific question, acknowledge that and provid
     messages.insert(0, {"role": "system", "content": system_message})
     
     data = {
-        "model": "anthropic/claude-3-sonnet@20240229",  # Using Claude Sonnet as fallback
+        "model": "openai/gpt-3.5-turbo",  # Using a model that's definitely available
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 800
@@ -118,13 +141,16 @@ If you don't know the answer to a specific question, acknowledge that and provid
     try:
         response = requests.post(url, headers=headers, json=data)
         
+        # Debug information
         if response.status_code != 200:
-            return f"Error: I'm having trouble connecting to the AI model. Please try again later."
+            st.sidebar.write(f"Error Code: {response.status_code}")
+            st.sidebar.write(f"Response: {response.text}")
+            return f"I'm having trouble connecting to the AI model. Please try again later."
         
         result = response.json()
         return result["choices"][0]["message"]["content"]
     except Exception as e:
-        return f"Error: Something went wrong. Please try again later."
+        return f"Error: {str(e)}"
 
 if __name__ == "__main__":
     main()
