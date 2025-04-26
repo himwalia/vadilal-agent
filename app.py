@@ -309,3 +309,4 @@ with st.container():
 
 # Footer
 st.markdown('<div class="footer">Vadilal AI Assistant - Using publicly available information only</div>', unsafe_allow_html=True)
+
