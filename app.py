@@ -115,7 +115,9 @@ def query_llm(prompt):
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://vadilal-chat-agent.streamlit.app/", # Adding this may help with API authentication
+        "X-Title": "Vadilal Assistant"  # Identifying your application
     }
     
     # Prepare messages with context
