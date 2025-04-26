@@ -2,7 +2,7 @@ import os
 import streamlit as st
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 
 def get_api_key():
     # Try to get API key from Streamlit secrets first (for production)
