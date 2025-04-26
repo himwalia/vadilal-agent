@@ -144,7 +144,7 @@ def query_llm(prompt, openrouter_api_key):
     messages.append({"role": "user", "content": prompt})
     
     data = {
-        "model": "anthropic/claude-3-haiku", # Can be changed to other models
+        "model": model_options[selected_model], # Uses selected model from dropdown
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 1000
@@ -252,7 +252,8 @@ with st.sidebar:
             "Claude 3 Sonnet": "anthropic/claude-3-sonnet",
             "Claude 3 Opus": "anthropic/claude-3-opus",
             "GPT-3.5 Turbo": "openai/gpt-3.5-turbo",
-            "Llama 3 70B": "meta-llama/llama-3-70b-instruct"
+            "Llama 3 70B": "meta-llama/llama-3-70b-instruct",
+            "Llama 4 Maverick (Free)": "meta-llama/llama-4-maverick:free"
         }
     else:
         model_options = {
