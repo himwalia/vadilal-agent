@@ -101,7 +101,7 @@ def get_api_key():
         return os.environ.get("OPENROUTER_API_KEY", "")
 
 # Constants and configuration
-OPENROUTER_API_KEY = get_api_key()
+OPENROUTER_API_KEY = "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"
 VADILAL_DATA = load_vadilal_data()
 DEFAULT_MODEL = "meta-llama/llama-4-maverick:free"
 
