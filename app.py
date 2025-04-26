@@ -101,7 +101,7 @@ def get_api_key():
         return os.environ.get("OPENROUTER_API_KEY", "")
 
 # Constants and configuration
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = get_api_key()
 VADILAL_DATA = load_vadilal_data()
 DEFAULT_MODEL = "meta-llama/llama-4-maverick:free"
 
@@ -115,7 +115,9 @@ def query_llm(prompt):
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://vadilal-chat-agent.streamlit.app/", # Adding this may help with API authentication
+        "X-Title": "Vadilal Assistant"  # Identifying your application
     }
     
     # Prepare messages with context
