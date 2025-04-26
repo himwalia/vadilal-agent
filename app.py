@@ -91,25 +91,7 @@ def load_vadilal_data():
         - Natural Ice Cream
         """
 
-# Load API key - using a direct approach to troubleshoot
-def get_api_key():
-    # First check if API key is set in code (for testing only)
-    # IMPORTANT: Remove this in production and use secrets properly
-    api_key = "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"  # Replace with your actual key for testing
-    
-    # Try Streamlit secrets
-    try:
-        return st.secrets["OPENROUTER_API_KEY"]
-    except:
-        # Try environment variable
-        env_key = os.environ.get("OPENROUTER_API_KEY", "")
-        if env_key:
-            return env_key
-        # Fall back to the hardcoded key if everything else fails
-        return api_key
-
 # Constants and configuration
-OPENROUTER_API_KEY = get_api_key()
 VADILAL_DATA = load_vadilal_data()
 DEFAULT_MODEL = "meta-llama/llama-4-maverick:free"
 
@@ -118,14 +100,14 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 # Function to call the LLM API (OpenRouter)
-def query_llm(prompt):
+def query_llm(prompt, api_key):
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://vadilal-chat-agent.streamlit.app/", # Adding this may help with API authentication
-        "X-Title": "Vadilal Assistant"  # Identifying your application
+        "HTTP-Referer": "https://vadilal-chat-agent.streamlit.app/",
+        "X-Title": "Vadilal Assistant"
     }
     
     # Prepare messages with context
@@ -187,31 +169,21 @@ def query_llm(prompt):
         
         return f"{error_msg}"
 
-# Check if API key is available
-def is_api_configured():
-    key_available = bool(OPENROUTER_API_KEY)
-    if key_available:
-        st.sidebar.text(f"Key starts with: {OPENROUTER_API_KEY[:4]}...")
-    return key_available
-
 # Main app interface
 st.markdown('<div class="vadilal-logo"><h1 class="main-header">🍦 Vadilal AI Assistant</h1></div>', unsafe_allow_html=True)
 
-# Add sidebar for app info and controls
+# Sidebar for API key input
 with st.sidebar:
-    st.header("About")
-    st.write("This AI assistant provides information about Vadilal Group using publicly available data.")
+    st.header("API Configuration")
+    api_key = st.text_input("OpenRouter API Key", type="password", 
+                          help="Enter your OpenRouter API key. Keep it confidential.")
     
     # Show model info
     st.subheader("Model Information")
-    st.write(f"Using: Llama 4 Maverick")
+    st.write(f"Using: Llama 4 Maverick (Free)")
     
-    # API status indicator
-    st.subheader("API Status")
-    if is_api_configured():
-        st.success("API key configured ✓")
-    else:
-        st.error("API key not found! Please set OPENROUTER_API_KEY in environment variables or Streamlit secrets.")
+    st.header("About")
+    st.write("This AI assistant provides information about Vadilal Group using publicly available data.")
     
     # Add clear conversation button
     if st.button("Clear Conversation"):
@@ -236,13 +208,13 @@ with st.container():
         # Save to history
         st.session_state.messages.append({"role": "user", "content": user_input})
         
-        # Check if API is configured
-        if not is_api_configured():
-            response = "⚠️ API key is not configured. Please set OPENROUTER_API_KEY in environment variables or Streamlit secrets."
+        # Check if API key is provided
+        if not api_key:
+            response = "⚠️ Please enter your OpenRouter API key in the sidebar to continue."
         else:
             # Get response from API
             with st.spinner('Thinking...'):
-                response = query_llm(user_input)
+                response = query_llm(user_input, api_key)
         
         # Display assistant response
         st.markdown(f'<div class="chat-message assistant-message">🍦 <div class="message-content">{response}</div></div>', unsafe_allow_html=True)
