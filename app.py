@@ -1,91 +1,88 @@
 import streamlit as st
-import os
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-
-def test_embeddings():
-    st.subheader("Testing OpenAI Embeddings")
-    
-    # Get API key from secrets
-    try:
-        api_key = st.secrets["openrouter"]["api_key"]
-        st.success("Successfully retrieved API key from secrets")
-    except Exception as e:
-        st.error(f"Error retrieving API key: {str(e)}")
-        return
-    
-    # Test embeddings with minimal parameters
-    st.write("Testing embeddings with minimal parameters...")
-    try:
-        embeddings = OpenAIEmbeddings(api_key=api_key)
-        result = embeddings.embed_query("Test query")
-        st.success(f"✅ Basic embeddings work! Vector length: {len(result)}")
-    except Exception as e:
-        st.error(f"❌ Basic embeddings failed: {str(e)}")
-    
-    # Test with OpenRouter parameters
-    st.write("Testing embeddings with OpenRouter...")
-    try:
-        embeddings = OpenAIEmbeddings(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1",
-            model="openai/text-embedding-ada-002"
-        )
-        result = embeddings.embed_query("Vadilal ice cream")
-        st.success(f"✅ OpenRouter embeddings work! Vector length: {len(result)}")
-    except Exception as e:
-        st.error(f"❌ OpenRouter embeddings failed: {str(e)}")
-
-def test_chat_completion():
-    st.subheader("Testing Chat Completion")
-    
-    # Get API key from secrets
-    try:
-        api_key = st.secrets["openrouter"]["api_key"]
-    except Exception as e:
-        st.error(f"Error retrieving API key: {str(e)}")
-        return
-    
-    # Test chat completion
-    st.write("Testing chat completion with Llama 4...")
-    try:
-        llm = ChatOpenAI(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1",
-            model="meta/llama-4-maverick"
-        )
-        result = llm.invoke("Tell me briefly about Vadilal ice cream")
-        st.success("✅ Chat completion works!")
-        st.write("Response:")
-        st.write(result.content)
-    except Exception as e:
-        st.error(f"❌ Chat completion failed: {str(e)}")
+import requests
+import json
 
 def main():
-    st.title("Vadilal Assistant - Diagnostic")
+    st.title("Vadilal Group AI Assistant")
     
-    st.write("""
-    This page tests core functionality to diagnose issues with the Vadilal assistant.
-    Click the buttons below to test different components.
-    """)
+    # Try to get API key from secrets
+    try:
+        api_key = st.secrets["openrouter"]["api_key"]
+    except:
+        api_key = None
+        st.error("API key not found in secrets. Please add it to Streamlit secrets.")
     
-    col1, col2 = st.columns(2)
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hello! I'm your Vadilal Group AI assistant. How can I help you today?"}
+        ]
     
-    with col1:
-        if st.button("Test Embeddings"):
-            test_embeddings()
+    # Display chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
     
-    with col2:
-        if st.button("Test Chat Completion"):
-            test_chat_completion()
+    # Get user input
+    if user_input := st.chat_input("Ask something about Vadilal Group..."):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        # Display user message
+        with st.chat_message("user"):
+            st.write(user_input)
+        
+        # Display assistant response
+        with st.chat_message("assistant"):
+            if api_key:
+                with st.spinner("Thinking..."):
+                    # Call OpenRouter API directly
+                    response = call_openrouter(user_input, api_key)
+                    st.write(response)
+                    # Add assistant response to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+            else:
+                st.write("Please add your OpenRouter API key to Streamlit secrets.")
+
+def call_openrouter(prompt, api_key):
+    """Call OpenRouter API directly without using langchain."""
+    url = "https://openrouter.ai/api/v1/chat/completions"
     
-    st.divider()
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     
-    # Simple question answering
-    st.subheader("Simple Question Answering")
-    user_input = st.text_input("Ask a question about Vadilal:")
-    if user_input:
-        st.write(f"You asked: {user_input}")
-        st.write("This is a placeholder response while we fix the RAG system.")
+    # Prepare conversation history
+    messages = [{"role": m["role"], "content": m["content"]} 
+                for m in st.session_state.messages if m["role"] in ["user", "assistant"]]
+    
+    # Add system message
+    messages.insert(0, {
+        "role": "system", 
+        "content": """You are a specialized AI assistant for the Vadilal Group, an Indian ice cream and frozen foods company.
+        Your goal is to provide accurate, informative responses about the company's history, products, financials, 
+        and market presence based on publicly available information."""
+    })
+    
+    # Add user's current prompt
+    messages.append({"role": "user", "content": prompt})
+    
+    data = {
+        "model": "meta/llama-4-maverick",  # Use Llama 4 Maverick
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": 1000
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()  # Raise an exception for 4XX/5XX responses
+        
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 if __name__ == "__main__":
     main()
