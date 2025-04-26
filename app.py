@@ -50,12 +50,14 @@ def call_openrouter(prompt, api_key):
     
     headers = {
         "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://vadilal-chat-agent.streamlit.app/", # Required by OpenRouter
+        "X-Title": "Vadilal Group AI Assistant",  # Optional but recommended
         "Content-Type": "application/json"
     }
     
-    # Prepare conversation history
+    # Prepare conversation history (only include the last few messages to keep context concise)
     messages = [{"role": m["role"], "content": m["content"]} 
-                for m in st.session_state.messages if m["role"] in ["user", "assistant"]]
+                for m in st.session_state.messages[-5:] if m["role"] in ["user", "assistant"]]
     
     # Add system message
     messages.insert(0, {
@@ -65,19 +67,22 @@ def call_openrouter(prompt, api_key):
         and market presence based on publicly available information."""
     })
     
-    # Add user's current prompt
-    messages.append({"role": "user", "content": prompt})
-    
     data = {
         "model": "meta/llama-4-maverick",  # Use Llama 4 Maverick
         "messages": messages,
-        "temperature": 0.2,
-        "max_tokens": 1000
+        "temperature": 0.7,
+        "max_tokens": 800
     }
     
     try:
         response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()  # Raise an exception for 4XX/5XX responses
+        
+        # Debug information
+        st.write(f"Status Code: {response.status_code}")
+        
+        if response.status_code != 200:
+            st.write(f"Response: {response.text}")
+            return f"Error: {response.status_code} - {response.text}"
         
         result = response.json()
         return result["choices"][0]["message"]["content"]
