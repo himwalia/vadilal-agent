@@ -91,17 +91,25 @@ def load_vadilal_data():
         - Natural Ice Cream
         """
 
-# Load API key from environment or secrets
+# Load API key - using a direct approach to troubleshoot
 def get_api_key():
-    # First try to get from Streamlit secrets
+    # First check if API key is set in code (for testing only)
+    # IMPORTANT: Remove this in production and use secrets properly
+    api_key = "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"  # Replace with your actual key for testing
+    
+    # Try Streamlit secrets
     try:
         return st.secrets["OPENROUTER_API_KEY"]
     except:
-        # Then try environment variable
-        return os.environ.get("OPENROUTER_API_KEY", "")
+        # Try environment variable
+        env_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if env_key:
+            return env_key
+        # Fall back to the hardcoded key if everything else fails
+        return api_key
 
 # Constants and configuration
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = get_api_key()
 VADILAL_DATA = load_vadilal_data()
 DEFAULT_MODEL = "meta-llama/llama-4-maverick:free"
 
@@ -181,7 +189,10 @@ def query_llm(prompt):
 
 # Check if API key is available
 def is_api_configured():
-    return bool(OPENROUTER_API_KEY)
+    key_available = bool(OPENROUTER_API_KEY)
+    if key_available:
+        st.sidebar.text(f"Key starts with: {OPENROUTER_API_KEY[:4]}...")
+    return key_available
 
 # Main app interface
 st.markdown('<div class="vadilal-logo"><h1 class="main-header">🍦 Vadilal AI Assistant</h1></div>', unsafe_allow_html=True)
