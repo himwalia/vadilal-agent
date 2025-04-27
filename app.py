@@ -318,7 +318,16 @@ def query_llm(prompt, api_key, model, enable_web_search=False):
     if enable_web_search:
         with st.status("Searching the web for information..."):
             web_search_results = search_web(prompt)
-        
+            
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://vadilal-chat-agent.streamlit.app/",
+        "X-Title": "Vadilal Assistant"
+    }
+    
         # Make the web results more prominent in the system message
         if web_search_results and "No search results found" not in web_search_results:
             system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
