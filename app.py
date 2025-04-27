@@ -333,7 +333,7 @@ def query_llm(prompt, api_key, model, enable_web_search=False):
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
-        "Authorization": f"Bearer {openrouter_api_key}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     
