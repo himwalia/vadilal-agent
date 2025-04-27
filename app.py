@@ -328,34 +328,34 @@ def query_llm(prompt, api_key, model, enable_web_search=False):
         "X-Title": "Vadilal Assistant"
     }
     
-        # Make the web results more prominent in the system message
-        if web_search_results and "No search results found" not in web_search_results:
-            system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
-            
-            IMPORTANT: I have searched the web for the user's query and found the following RECENT INFORMATION. 
-            This information is current and should be used to answer the question:
-            
-            {web_search_results}
-            
-            Additionally, here is background information about Vadilal:
-            {VADILAL_DATA}
-            
-            Current date: {datetime.now().strftime('%B %d, %Y')}
-            
-            When answering the user's question, prioritize the recent web search results over your built-in knowledge.
-            If the web search results contain relevant information to the query, be sure to mention that you found this information online.
-            """
-        else:
-            # Default system message when no web results
-            system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
-            Answer questions based on the following information about Vadilal. 
-            If you don't know the answer, politely say so without making up information.
-            
-            VADILAL INFORMATION:
-            {VADILAL_DATA}
-            
-            Current date: {datetime.now().strftime('%B %d, %Y')}
-            """
+    # Make the web results more prominent in the system message
+    if web_search_results and "No search results found" not in web_search_results:
+        system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
+        
+        IMPORTANT: I have searched the web for the user's query and found the following RECENT INFORMATION. 
+        This information is current and should be used to answer the question:
+        
+        {web_search_results}
+        
+        Additionally, here is background information about Vadilal:
+        {VADILAL_DATA}
+        
+        Current date: {datetime.now().strftime('%B %d, %Y')}
+        
+        When answering the user's question, prioritize the recent web search results over your built-in knowledge.
+        If the web search results contain relevant information to the query, be sure to mention that you found this information online.
+        """
+    else:
+        # Default system message when no web results
+        system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
+        Answer questions based on the following information about Vadilal. 
+        If you don't know the answer, politely say so without making up information.
+        
+        VADILAL INFORMATION:
+        {VADILAL_DATA}
+        
+        Current date: {datetime.now().strftime('%B %d, %Y')}
+        """
     # Add web results to system message when available
     if web_search_results:
         system_message += f"\n\nRECENT WEB SEARCH RESULTS ABOUT VADILAL:\n{web_search_results}\n"
