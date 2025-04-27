@@ -56,28 +56,26 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def search_web(query, num_results=3):
-    """
-    Simple web search function using DuckDuckGo
-    Returns snippets from search results
-    """
+def search_web(query, num_results=5):
+    """Enhanced web search function using DuckDuckGo"""
     try:
-        # Format the search query
-        search_query = query.replace(' ', '+')
+        # Make search more specific to Vadilal
+        search_query = f"Vadilal Industries {query} latest information"
+        search_query = search_query.replace(' ', '+')
         url = f"https://html.duckduckgo.com/html/?q={search_query}"
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
         response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        # Parse the HTML response
         soup = BeautifulSoup(response.text, 'html.parser')
         results = soup.find_all('div', class_='result__body')
         
-        search_results = []
+        if not results:
+            return "No search results found."
+            
+        formatted_results = "Here are the latest search results about Vadilal:\n\n"
         for i, result in enumerate(results[:num_results]):
             title_elem = result.find('a', class_='result__a')
             snippet_elem = result.find('a', class_='result__snippet')
@@ -85,18 +83,9 @@ def search_web(query, num_results=3):
             title = title_elem.text.strip() if title_elem else "No title found"
             snippet = snippet_elem.text.strip() if snippet_elem else "No snippet found"
             
-            search_results.append({
-                "title": title,
-                "snippet": snippet
-            })
+            formatted_results += f"RESULT {i+1}:\nTitle: {title}\nInfo: {snippet}\n\n"
         
-        # Format results as text
-        formatted_results = ""
-        for i, result in enumerate(search_results):
-            formatted_results += f"[{i+1}] {result['title']}\n{result['snippet']}\n\n"
-        
-        return formatted_results if formatted_results else "No search results found."
-    
+        return formatted_results
     except Exception as e:
         return f"Error searching the web: {str(e)}"
 
@@ -328,25 +317,36 @@ def query_llm(prompt, api_key, model, enable_web_search=False):
     
     if enable_web_search:
         with st.status("Searching the web for information..."):
-            web_search_results = search_web(f"Vadilal ice cream {prompt}")
-    
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    # Prepare messages with context
-    system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company. 
-    Answer questions based on the following information about Vadilal. 
-    If you don't know the answer, politely say so without making up information.
-    
-    VADILAL INFORMATION:
-    {VADILAL_DATA}
-    
-    Current date: {datetime.now().strftime('%B %d, %Y')}
-    """
+            web_search_results = search_web(prompt)
+        
+        # Make the web results more prominent in the system message
+        if web_search_results and "No search results found" not in web_search_results:
+            system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
+            
+            IMPORTANT: I have searched the web for the user's query and found the following RECENT INFORMATION. 
+            This information is current and should be used to answer the question:
+            
+            {web_search_results}
+            
+            Additionally, here is background information about Vadilal:
+            {VADILAL_DATA}
+            
+            Current date: {datetime.now().strftime('%B %d, %Y')}
+            
+            When answering the user's question, prioritize the recent web search results over your built-in knowledge.
+            If the web search results contain relevant information to the query, be sure to mention that you found this information online.
+            """
+        else:
+            # Default system message when no web results
+            system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
+            Answer questions based on the following information about Vadilal. 
+            If you don't know the answer, politely say so without making up information.
+            
+            VADILAL INFORMATION:
+            {VADILAL_DATA}
+            
+            Current date: {datetime.now().strftime('%B %d, %Y')}
+            """
     # Add web results to system message when available
     if web_search_results:
         system_message += f"\n\nRECENT WEB SEARCH RESULTS ABOUT VADILAL:\n{web_search_results}\n"
@@ -406,7 +406,7 @@ def query_anthropic(prompt, anthropic_api_key, model, enable_web_search=False):
     
     if enable_web_search:
         with st.status("Searching the web for information..."):
-            web_search_results = search_web(f"Vadilal ice cream {prompt}")
+            web_search_results = search_web(prompt)
     
     url = "https://api.anthropic.com/v1/messages"
     
@@ -416,19 +416,38 @@ def query_anthropic(prompt, anthropic_api_key, model, enable_web_search=False):
         "content-type": "application/json"
     }
     
-    system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company. 
-    Answer questions based on the following information about Vadilal. 
-    If you don't know the answer, politely say so without making up information.
-    
-    VADILAL INFORMATION:
-    {VADILAL_DATA}
-    
-    Current date: {datetime.now().strftime('%B %d, %Y')}
-    """
+    # Similar improvement in how we structure the system message
+    if web_search_results and "No search results found" not in web_search_results:
+        system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
+        
+        IMPORTANT: I have searched the web for the user's query and found the following RECENT INFORMATION. 
+        This information is current and should be used to answer the question:
+        
+        {web_search_results}
+        
+        Additionally, here is background information about Vadilal:
+        {VADILAL_DATA}
+        
+        Current date: {datetime.now().strftime('%B %d, %Y')}
+        
+        When answering the user's question, prioritize the recent web search results over your built-in knowledge.
+        If the web search results contain relevant information to the query, be sure to mention that you found this information online.
+        """
+    else:
+        # Default system message when no web results
+        system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
+        Answer questions based on the following information about Vadilal. 
+        If you don't know the answer, politely say so without making up information.
+        
+        VADILAL INFORMATION:
+        {VADILAL_DATA}
+        
+        Current date: {datetime.now().strftime('%B %d, %Y')}
+        """
     
     # Format history in Anthropic's format
     messages = []
-    for message in st.session_state.messages:
+    for message in st.session_state.messages[-10:]:
         if message["role"] == "user":
             messages.append({"role": "user", "content": message["content"]})
         else:
@@ -438,8 +457,8 @@ def query_anthropic(prompt, anthropic_api_key, model, enable_web_search=False):
     messages.append({"role": "user", "content": prompt})
     
     data = {
-        "model": "claude-3-haiku-20240307",
-        "system": system_message,
+        "model": model,
+        "system": system_message,  # This is where the system message with web results is used
         "messages": messages,
         "max_tokens": 1000
     }
