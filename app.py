@@ -4,6 +4,10 @@ import json
 import os
 from datetime import datetime
 
+import requests
+from bs4 import BeautifulSoup
+import re
+
 # Page configuration
 st.set_page_config(
     page_title="Vadilal AI Assistant",
@@ -50,6 +54,52 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+
+def search_web(query, num_results=3):
+    """
+    Simple web search function using DuckDuckGo
+    Returns snippets from search results
+    """
+    try:
+        # Format the search query
+        search_query = query.replace(' ', '+')
+        url = f"https://html.duckduckgo.com/html/?q={search_query}"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        # Parse the HTML response
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = soup.find_all('div', class_='result__body')
+        
+        search_results = []
+        for i, result in enumerate(results[:num_results]):
+            title_elem = result.find('a', class_='result__a')
+            snippet_elem = result.find('a', class_='result__snippet')
+            
+            title = title_elem.text.strip() if title_elem else "No title found"
+            snippet = snippet_elem.text.strip() if snippet_elem else "No snippet found"
+            
+            search_results.append({
+                "title": title,
+                "snippet": snippet
+            })
+        
+        # Format results as text
+        formatted_results = ""
+        for i, result in enumerate(search_results):
+            formatted_results += f"[{i+1}] {result['title']}\n{result['snippet']}\n\n"
+        
+        return formatted_results if formatted_results else "No search results found."
+    
+    except Exception as e:
+        return f"Error searching the web: {str(e)}"
+
 
 # Vadilal company data (publicly available)
 VADILAL_DATA = """
@@ -273,7 +323,13 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 # Function to call the LLM API (OpenRouter)
-def query_llm(prompt, openrouter_api_key):
+def query_llm(prompt, api_key, model, enable_web_search=False):
+    web_search_results = ""
+    
+    if enable_web_search:
+        with st.status("Searching the web for information..."):
+            web_search_results = search_web(f"Vadilal ice cream {prompt}")
+    
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
@@ -291,7 +347,11 @@ def query_llm(prompt, openrouter_api_key):
     
     Current date: {datetime.now().strftime('%B %d, %Y')}
     """
-    
+    # Add web results to system message when available
+    if web_search_results:
+        system_message += f"\n\nRECENT WEB SEARCH RESULTS ABOUT VADILAL:\n{web_search_results}\n"
+        system_message += "Use the web search results to supplement your knowledge, especially for recent information."
+
     messages = [
         {"role": "system", "content": system_message},
     ]
@@ -341,7 +401,13 @@ def query_llm(prompt, openrouter_api_key):
         return f"{error_msg}\n\nTry an alternative approach: check your API connection settings or try a different LLM provider."
 
 # Alternative function using direct Anthropic API (in case OpenRouter continues to fail)
-def query_anthropic(prompt, anthropic_api_key):
+def query_anthropic(prompt, anthropic_api_key, model, enable_web_search=False):
+    web_search_results = ""
+    
+    if enable_web_search:
+        with st.status("Searching the web for information..."):
+            web_search_results = search_web(f"Vadilal ice cream {prompt}")
+    
     url = "https://api.anthropic.com/v1/messages"
     
     headers = {
@@ -424,6 +490,14 @@ with st.sidebar:
     
     selected_model = st.selectbox("Select Model:", list(model_options.keys()))
     
+    # Add search mode selection
+    st.header("Search Options")
+    search_mode = st.radio(
+        "Information Source:",
+        ["Local Data Only", "Web Search Enabled"],
+        help="Choose whether to use only pre-loaded Vadilal data or enable web searching for recent information."
+    )
+    
     st.divider()
     st.subheader("About")
     st.write("This AI assistant provides information about Vadilal Group using publicly available data.")
@@ -454,10 +528,13 @@ with st.container():
         # Get response from selected API
         with st.spinner('Thinking...'):
             if api_key:
+                # Check if web search is enabled
+                enable_web_search = (search_mode == "Web Search Enabled")
+                
                 if api_option == "OpenRouter":
-                    response = query_llm(user_input, api_key)
+                    response = query_llm(user_input, api_key, model_options[selected_model], enable_web_search)
                 else:
-                    response = query_anthropic(user_input, api_key)
+                    response = query_anthropic(user_input, api_key, model_options[selected_model], enable_web_search)
             else:
                 response = "⚠️ Please enter an API key in the sidebar to continue."
         
@@ -466,7 +543,7 @@ with st.container():
         
         # Save to history
         st.session_state.messages.append({"role": "assistant", "content": response})
-
+        
 # Footer
 st.markdown('<div class="footer">Vadilal AI Assistant - Using publicly available information only</div>', unsafe_allow_html=True)
 
