@@ -317,7 +317,7 @@ def query_llm(prompt, api_key, model, enable_web_search=False):
     
     if enable_web_search:
         with st.status("Searching the web for information..."):
-            web_search_results = search_web(prompt)
+            web_search_results = search_web(f"Vadilal ice cream {prompt}")
             
     url = "https://openrouter.ai/api/v1/chat/completions"
     
@@ -347,19 +347,21 @@ def query_llm(prompt, api_key, model, enable_web_search=False):
         """
     else:
         # Default system message when no web results
-        system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company.
-        Answer questions based on the following information about Vadilal. 
-        If you don't know the answer, politely say so without making up information.
-        
-        VADILAL INFORMATION:
-        {VADILAL_DATA}
-        
-        Current date: {datetime.now().strftime('%B %d, %Y')}
-        """
+        system_message = f"""You are a helpful AI assistant for Vadilal Group, an Indian ice cream company. 
+    Answer questions based on the following information about Vadilal. 
+    If you don't know the answer, politely say so without making up information.
+    
+    VADILAL INFORMATION:
+    {VADILAL_DATA}
+    
+    Current date: {datetime.now().strftime('%B %d, %Y')}
+    """
+    
     # Add web results to system message when available
     if web_search_results:
         system_message += f"\n\nRECENT WEB SEARCH RESULTS ABOUT VADILAL:\n{web_search_results}\n"
         system_message += "Use the web search results to supplement your knowledge, especially for recent information."
+
 
     messages = [
         {"role": "system", "content": system_message},
@@ -415,7 +417,7 @@ def query_anthropic(prompt, anthropic_api_key, model, enable_web_search=False):
     
     if enable_web_search:
         with st.status("Searching the web for information..."):
-            web_search_results = search_web(prompt)
+            web_search_results = search_web(f"Vadilal ice cream {prompt}")
     
     url = "https://api.anthropic.com/v1/messages"
     
@@ -554,17 +556,18 @@ with st.container():
         st.session_state.messages.append({"role": "user", "content": user_input})
         
         # Get response from selected API
-        with st.spinner('Thinking...'):
-            if api_key:
-                # Check if web search is enabled
-                enable_web_search = (search_mode == "Web Search Enabled")
-                
-                if api_option == "OpenRouter":
-                    response = query_llm(user_input, api_key, model_options[selected_model], enable_web_search)
-                else:
-                    response = query_anthropic(user_input, api_key, model_options[selected_model], enable_web_search)
+        # Get response from selected API
+    with st.spinner('Thinking...'):
+        if api_key:
+            # Check if web search is enabled
+            enable_web_search = (search_mode == "Web Search Enabled")
+            
+            if api_option == "OpenRouter":
+                response = query_llm(user_input, api_key, model_options[selected_model], enable_web_search)
             else:
-                response = "⚠️ Please enter an API key in the sidebar to continue."
+                response = query_anthropic(user_input, api_key, model_options[selected_model], enable_web_search)
+        else:
+            response = "⚠️ Please enter an API key in the sidebar to continue."
         
         # Display assistant response
         st.markdown(f'<div class="chat-message assistant-message">🍦 <div class="message-content">{response}</div></div>', unsafe_allow_html=True)
