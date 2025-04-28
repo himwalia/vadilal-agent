@@ -312,12 +312,12 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 # Function to call the LLM API (OpenRouter)
-def query_llm(prompt, api_key, model, enable_web_search=False):
+def query_llm(prompt, api_key, model, enable_web_search=False, serp_api_key=None):
     web_search_results = ""
     
-    if enable_web_search:
+    if enable_web_search and serp_api_key:
         with st.status("Searching the web for information..."):
-            web_search_results = search_web(f"Vadilal ice cream {prompt}")
+            web_search_results = search_serp_api(prompt, serp_api_key)
             
     url = "https://openrouter.ai/api/v1/chat/completions"
     
@@ -522,11 +522,18 @@ with st.sidebar:
     
     # Add search mode selection
     st.header("Search Options")
-    search_mode = st.radio(
-        "Information Source:",
-        ["Local Data Only", "Web Search Enabled"],
-        help="Choose whether to use only pre-loaded Vadilal data or enable web searching for recent information."
-    )
+search_mode = st.radio(
+    "Information Source:",
+    ["Local Data Only", "Web Search Enabled"],
+    help="Choose whether to use only pre-loaded Vadilal data or enable web searching for recent information."
+)
+
+# Show SERP API key input only if web search is enabled
+if search_mode == "Web Search Enabled":
+    serp_api_key = st.text_input("SERP API Key", type="password", 
+                          help="Enter your SERP API key for web search functionality. Get one at serpapi.com")
+else:
+    serp_api_key = ""
     
     st.divider()
     st.subheader("About")
@@ -574,7 +581,50 @@ with st.container():
         
         # Save to history
         st.session_state.messages.append({"role": "assistant", "content": response})
+
+def search_serp_api(query, api_key, num_results=5):
+    """
+    Search the web using SERP API
+    """
+    try:
+        # Build the search URL with the query and API key
+        search_query = f"Vadilal Industries {query}"
+        params = {
+            "q": search_query,
+            "api_key": api_key,
+            "num": str(num_results)
+        }
         
+        # Make the API request
+        base_url = "https://serpapi.com/search"
+        response = requests.get(base_url, params=params, timeout=15)
+        response.raise_for_status()
+        
+        # Parse the JSON response
+        results = response.json()
+        
+        if "error" in results:
+            return f"SERP API Error: {results['error']}"
+            
+        # Format the results
+        formatted_results = "Web search results:\n\n"
+        
+        # Add organic results
+        if "organic_results" in results and results["organic_results"]:
+            for i, result in enumerate(results["organic_results"][:num_results]):
+                title = result.get("title", "No title")
+                snippet = result.get("snippet", "No description available")
+                link = result.get("link", "")
+                
+                formatted_results += f"SOURCE {i+1}: {title}\n"
+                formatted_results += f"Description: {snippet}\n\n"
+        else:
+            formatted_results += "No relevant search results found.\n\n"
+            
+        return formatted_results
+    except Exception as e:
+        return f"Error searching with SERP API: {str(e)}"
+
 # Footer
 st.markdown('<div class="footer">Vadilal AI Assistant - Using publicly available information only</div>', unsafe_allow_html=True)
 
